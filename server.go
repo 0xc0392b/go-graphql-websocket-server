@@ -1,8 +1,36 @@
 package gqlwss
 
 import (
+	"context"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
+
+func upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	// setup upgrader
+	upgrader := &websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+
+	// do the upgrade and return pointer to socket
+	if socket, err := upgrader.Upgrade(w, r, nil); err != nil {
+		return nil, err
+	} else {
+		return socket, nil
+	}
+}
+
+func auth(r *http.Request) (string, error) {
+
+	// ...
+
+	return "", nil
+}
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
@@ -22,7 +50,6 @@ func (s GraphQL) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// do authentication
 	key, err := auth(r)
 	if err != nil {
-		log.Println(err)
 		return
 	} else {
 		// success - add key to context
@@ -32,7 +59,6 @@ func (s GraphQL) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// do connection upgrade
 	socket, err := upgrade(w, r)
 	if err != nil {
-		log.Println(err)
 		return
 	} else {
 		// success - add socket to context

@@ -3,7 +3,6 @@ package gqlwss
 import (
 	"context"
 	"log"
-	"net/http"
 	"strconv"
 
 	"github.com/gorilla/websocket"
@@ -12,22 +11,11 @@ import (
 	"github.com/graphql-go/graphql/language/source"
 )
 
-func upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
-	// setup upgrader
-	upgrader := &websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
-
-	// do the upgrade and return pointer to socket
-	if socket, err := upgrader.Upgrade(w, r, nil); err != nil {
-		return nil, err
-	} else {
-		return socket, nil
-	}
+func (m message) String() string {
+	msgId := strconv.FormatInt(m.Id, 10)
+	msgType := m.Type
+	msgPayload := m.Payload
+	return "[" + msgId + "] " + msgType + ": " + msgPayload
 }
 
 func connectionLoop(ctx context.Context) {
@@ -39,7 +27,7 @@ func connectionLoop(ctx context.Context) {
 	ctx = context.WithValue(ctx, outputsKey, make(chan message))
 	ctx = context.WithValue(ctx, errorsKey, make(chan error))
 
-	// the connection loop needs to know about inputs and errors
+	// the connection loop only needs to know about inputs and errors
 	inputs := ctx.Value(inputsKey).(chan message)
 	errors := ctx.Value(errorsKey).(chan error)
 
@@ -52,61 +40,29 @@ func connectionLoop(ctx context.Context) {
 
 	for {
 		select {
-		// read error, cancel connection context, stop loop
+		// read error, cancel connection context, stop loops
 		case error := <-errors:
-			// debugging
 			log.Println(error)
-
-			// stops read and write and write loops as well as
-			// all active subscription routines
 			cancel(error)
 			break
 
 		// read next input, do state transition
 		case input := <-inputs:
-			// debugging
 			log.Println(input.String())
 
 			// each input gets its own context
-			// attach current state and input to context
 			ctx = context.WithValue(ctx, currentStateKey, current)
 			ctx = context.WithValue(ctx, messageKey, input)
 
-			// do the state transition
 			next, action := stateTransition(ctx)
-
-			// replce current state and do the given action
 			current = next
 			go action(ctx)
 		}
 	}
 }
 
-func writeLoop(ctx context.Context) {
-	// retrieve the socket and outputs channel from context
-	socket := ctx.Value(socketKey).(*websocket.Conn)
-	outputs := ctx.Value(outputsKey).(chan message)
-	errors := ctx.Value(errorsKey).(chan error)
-
-	for {
-		select {
-		// connection context has been cancelled
-		case <-ctx.Done():
-			break
-
-		// wait for output message
-		case output := <-outputs:
-			if err := socket.WriteJSON(output); err != nil {
-				// signal to connection loop that it should
-				// cancel the context
-				errors <- err
-			}
-		}
-	}
-}
-
 func readLoop(ctx context.Context) {
-	// retrieve the socket and inputs channel from context
+	// read loop needs to know about the socket, inputs, and errors
 	socket := ctx.Value(socketKey).(*websocket.Conn)
 	inputs := ctx.Value(inputsKey).(chan message)
 	errors := ctx.Value(errorsKey).(chan error)
@@ -135,14 +91,38 @@ func readLoop(ctx context.Context) {
 				// cancel the context
 				errors <- err
 			} else {
+				// send input to connectop loop
 				inputs <- input
 			}
 		}
 	}
 }
 
+func writeLoop(ctx context.Context) {
+	// write loop needs to know about the socket, ouputs, and errors
+	socket := ctx.Value(socketKey).(*websocket.Conn)
+	outputs := ctx.Value(outputsKey).(chan message)
+	errors := ctx.Value(errorsKey).(chan error)
+
+	for {
+		select {
+		// connection context has been cancelled
+		case <-ctx.Done():
+			break
+
+		// wait for output message
+		case output := <-outputs:
+			if err := socket.WriteJSON(output); err != nil {
+				// signal to connection loop that it should
+				// cancel the context
+				errors <- err
+			}
+		}
+	}
+}
+
 func stateTransition(ctx context.Context) (state, action) {
-	// ...
+	// state transition needs to know about the current state and inputs
 	current := ctx.Value(currentStateKey).(state)
 	input := ctx.Value(inputsKey).(message)
 
@@ -228,44 +208,82 @@ func nothing(ctx context.Context) {
 	// noop
 }
 
-func pong(ctx context.Context) {
+func subscribe(ctx context.Context) {
+	// subscribe needs to know about the schema, inputs, and outputs
+	schema := ctx.Value(schemaKey).(graphql.Schema)
+	input := ctx.Value(inputsKey).(message)
+	//	outputs := ctx.Value(outputsKey).(chan message)
+
 	// ...
+	params := graphql.Params{
+		Schema:        schema,
+		RequestString: input.Payload,
+	}
+
+	// ...
+	source := source.NewSource(&source.Source{
+		Body: []byte(params.RequestString),
+		Name: "GraphQL request",
+	})
+
+	// parse the graphql input
+	ast, err := parser.Parse(parser.ParseParams{Source: source})
+	if err != nil {
+		return
+	}
+
+	// validate ast against the schema
+	validation := graphql.ValidateDocument(&schema, ast, nil)
+	if !validation.IsValid {
+		return
+	}
+
+	// ...
+	execute := graphql.ExecuteParams{
+		AST:           ast,
+		Schema:        params.Schema,
+		Root:          params.RootObject,
+		Args:          params.VariableValues,
+		OperationName: params.OperationName,
+	}
+
+	log.Println(execute)
+
+	// ...
+
+}
+
+func pong(ctx context.Context) {
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "Pong"}
 }
 
 func connectionAck(ctx context.Context) {
-	// ...
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "ConnectionAck"}
 }
 
 func errorAlreadyInitialised(ctx context.Context) {
-	// ...
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "Error"}
 }
 
 func errorNotInitialised(ctx context.Context) {
-	// ...
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "Error"}
 }
 
 func errorIdAlreadyExists(ctx context.Context) {
-	// ...
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "Error"}
 }
 
 func errorIdDoesNotExist(ctx context.Context) {
-	// ...
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "Error"}
 }
 
 func errorUnknownMessageType(ctx context.Context) {
-	// ...
 	outputs := ctx.Value(outputsKey).(chan message)
 	outputs <- message{Type: "Error"}
 }
