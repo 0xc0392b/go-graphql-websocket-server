@@ -11,11 +11,30 @@ import (
 	"github.com/graphql-go/graphql/language/source"
 )
 
+func (i opId) String() string {
+	return strconv.FormatInt(int64(i), 10)
+}
+
 func (m message) String() string {
-	msgId := strconv.FormatInt(m.Id, 10)
-	msgType := m.Type
-	msgPayload := m.Payload
-	return "[" + msgId + "] " + msgType + ": " + msgPayload
+	return "[" + m.Id.String() + "] " + m.Type + ": " + m.Payload
+}
+
+func (m opMap) Exists(id opId) bool {
+	if _, ok := m[id]; ok {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (m opMap) Add(id opId, ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	m[id] = op{ctx, cancel}
+}
+
+func (m opMap) Remove(id opId) {
+	m[id].cancel()
+	delete(m, id)
 }
 
 func connectionLoop(ctx context.Context) {
@@ -38,12 +57,16 @@ func connectionLoop(ctx context.Context) {
 	go readLoop(ctx)
 	go writeLoop(ctx)
 
-	for {
+	// stop flag will be set to true when an error is received
+	stop := false
+
+	for !stop {
 		select {
 		// read error, cancel connection context, stop loops
 		case error := <-errors:
 			log.Println(error)
 			cancel(error)
+			stop = true
 			break
 
 		// read next input, do state transition
@@ -76,10 +99,14 @@ func readLoop(ctx context.Context) {
 	// TODO: set pong handler
 	// ... socket.SetPongHandler(func(string) { ... })
 
-	for {
+	// stop flag will be set to true when an error is received
+	stop := false
+
+	for !stop {
 		select {
 		// connection context has been cancelled
 		case <-ctx.Done():
+			stop = true
 			break
 
 		// wait for input message
@@ -104,10 +131,14 @@ func writeLoop(ctx context.Context) {
 	outputs := ctx.Value(outputsKey).(chan message)
 	errors := ctx.Value(errorsKey).(chan error)
 
-	for {
+	// stop flag will be set to true when an error is received
+	stop := false
+
+	for !stop {
 		select {
 		// connection context has been cancelled
 		case <-ctx.Done():
+			stop = true
 			break
 
 		// wait for output message
@@ -124,7 +155,7 @@ func writeLoop(ctx context.Context) {
 func stateTransition(ctx context.Context) (state, action) {
 	// state transition needs to know about the current state and inputs
 	current := ctx.Value(currentStateKey).(state)
-	input := ctx.Value(inputsKey).(message)
+	input := ctx.Value(messageKey).(message)
 
 	// see the following link for graphql-ws protocol spec
 	// https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
@@ -155,7 +186,7 @@ func stateTransition(ctx context.Context) (state, action) {
 		} else {
 			next := current
 			next.isInitialised = true
-			next.operations = make(map[int64]operation)
+			next.ops = make(opMap)
 			return next, connectionAck
 		}
 
@@ -169,12 +200,11 @@ func stateTransition(ctx context.Context) (state, action) {
 	case "Subscribe":
 		if !current.isInitialised {
 			return current, errorNotInitialised
-		} else if _, exists := current.operations[input.Id]; exists {
+		} else if current.ops.Exists(input.Id) {
 			return current, errorIdAlreadyExists
 		} else {
-			ctx, cancel := context.WithCancel(ctx)
 			next := current
-			next.operations[input.Id] = operation{ctx, cancel}
+			next.ops.Add(input.Id, ctx)
 			return next, subscribe
 		}
 
@@ -187,12 +217,11 @@ func stateTransition(ctx context.Context) (state, action) {
 	case "Complete":
 		if !current.isInitialised {
 			return current, errorNotInitialised
-		} else if _, exists := current.operations[input.Id]; !exists {
+		} else if !current.ops.Exists(input.Id) {
 			return current, errorIdDoesNotExist
 		} else {
 			next := current
-			next.operations[input.Id].cancel()
-			delete(next.operations, input.Id)
+			next.ops.Remove(input.Id)
 			return next, nothing
 		}
 
@@ -211,8 +240,8 @@ func nothing(ctx context.Context) {
 func subscribe(ctx context.Context) {
 	// subscribe needs to know about the schema, inputs, and outputs
 	schema := ctx.Value(schemaKey).(graphql.Schema)
-	input := ctx.Value(inputsKey).(message)
-	//	outputs := ctx.Value(outputsKey).(chan message)
+	input := ctx.Value(messageKey).(message)
+	outputs := ctx.Value(outputsKey).(chan message)
 
 	// ...
 	params := graphql.Params{
@@ -247,43 +276,52 @@ func subscribe(ctx context.Context) {
 		OperationName: params.OperationName,
 	}
 
-	log.Println(execute)
+	result := graphql.Execute(execute)
+	log.Println(result)
+	outputs <- message{Id: input.Id, Type: "Next", Payload: input.Payload}
 
 	// ...
 
 }
 
 func pong(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "Pong"}
+	outputs <- message{Id: input.Id, Type: "Pong"}
 }
 
 func connectionAck(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "ConnectionAck"}
+	outputs <- message{Id: input.Id, Type: "ConnectionAck"}
 }
 
 func errorAlreadyInitialised(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error"}
 }
 
 func errorNotInitialised(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error"}
 }
 
 func errorIdAlreadyExists(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error"}
 }
 
 func errorIdDoesNotExist(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error"}
 }
 
 func errorUnknownMessageType(ctx context.Context) {
+	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error"}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"github.com/graphql-go/graphql"
 )
 
@@ -20,20 +21,24 @@ var (
 
 type contextKey string
 
+type opId int64
+
+type opMap map[opId]op
+
 type action func(context.Context)
 
-type operation struct {
+type op struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
 type state struct {
 	isInitialised bool
-	operations    map[int64]operation
+	ops           opMap
 }
 
 type message struct {
-	Id      int64  `json:"id"`
+	Id      opId   `json:"id"`
 	Type    string `json:"type"`
 	Payload string `json:"payload"`
 }
@@ -48,8 +53,9 @@ type Server struct {
 	mux *http.ServeMux
 }
 
-type GraphQL struct {
-	schema graphql.Schema
+type GraphQLSocket struct {
+	schema   graphql.Schema
+	upgrader websocket.Upgrader
 }
 
 type Auth struct {
