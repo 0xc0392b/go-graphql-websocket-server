@@ -39,7 +39,7 @@ func TestGraphQL(t *testing.T) {
 	in1 := `{"id": 1, "type": "ConnectionInit"}`
 	c.WriteMessage(websocket.TextMessage, []byte(in1))
 
-	in2 := `{"id": 2, "type": "Subscribe", "payload": "query { getUser { name } }"}`
+	in2 := `{"id": 2, "type": "Subscribe", "payload": "query { getUser { id, name } }"}`
 	c.WriteMessage(websocket.TextMessage, []byte(in2))
 
 	for {

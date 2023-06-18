@@ -2,6 +2,7 @@ package gqlwss
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"strconv"
 
@@ -276,10 +277,47 @@ func subscribe(ctx context.Context) {
 		OperationName: params.OperationName,
 	}
 
-	result := graphql.Execute(execute)
-	log.Println(result)
-	outputs <- message{Id: input.Id, Type: "Next", Payload: input.Payload}
+	// ...
+	results := make(chan *graphql.Result)
+	stop := false
 
+	// ...
+	go func() {
+		result := graphql.Execute(execute)
+		results <- result
+		close(results)
+	}()
+
+	for !stop {
+		select {
+		// connection context has been cancelled
+		case <-ctx.Done():
+			stop = true
+			break
+
+		// ...
+		case result, ok := <-results:
+			if ok {
+				if payload, err := json.Marshal(result); err != nil {
+					outputs <- message{
+						Id:   input.Id,
+						Type: "Error",
+					}
+				} else {
+					outputs <- message{
+						Id:      input.Id,
+						Type:    "Next",
+						Payload: string(payload),
+					}
+				}
+			} else {
+				stop = true
+				break
+			}
+		}
+	}
+
+	// need to remove the operation from opmap
 	// ...
 
 }

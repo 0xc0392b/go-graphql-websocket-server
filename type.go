@@ -27,6 +27,12 @@ type opMap map[opId]op
 
 type action func(context.Context)
 
+type testUser struct {
+	Id    int64
+	Name  string
+	Email string
+}
+
 type op struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -40,7 +46,7 @@ type state struct {
 type message struct {
 	Id      opId   `json:"id"`
 	Type    string `json:"type"`
-	Payload string `json:"payload"`
+	Payload string `json:"payload,omitempty"`
 }
 
 type Options struct {

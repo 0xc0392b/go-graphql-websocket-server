@@ -18,7 +18,7 @@ func newTestClientServer(h http.Handler) (*websocket.Conn, *httptest.Server, err
 
 func newTestSchema() (*graphql.Schema, error) {
 	userResolver := func(p graphql.ResolveParams) (interface{}, error) {
-		return nil, nil
+		return testUser{1, "test user", "test@user.com"}, nil
 	}
 
 	userType := graphql.NewObject(
