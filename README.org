@@ -1,4 +1,4 @@
-#+TITLE:  GraphQL websocket server for Golang
+#+TITLE:  GraphQL WebSocket server for Golang
 #+AUTHOR: William Santos
 #+EMAIL:  w@wsantos.net
 
