@@ -9,14 +9,16 @@ import (
 )
 
 var (
-	authKey         = contextKey("auth key")
-	inputsKey       = contextKey("inputs")
-	outputsKey      = contextKey("outputs")
-	errorsKey       = contextKey("errors")
-	schemaKey       = contextKey("schema")
-	socketKey       = contextKey("socket")
-	messageKey      = contextKey("message")
-	currentStateKey = contextKey("current state")
+	authKey           = contextKey("auth key")
+	inputsKey         = contextKey("inputs")
+	outputsKey        = contextKey("outputs")
+	errorsKey         = contextKey("errors")
+	schemaKey         = contextKey("schema")
+	socketKey         = contextKey("socket")
+	messageKey        = contextKey("message")
+	currentStateKey   = contextKey("current state")
+	executeResultsKey = contextKey("graphql execute results")
+	executeParamsKey  = contextKey("graphql execute params")
 )
 
 type contextKey string

@@ -12,12 +12,25 @@ import (
 	"github.com/graphql-go/graphql/language/source"
 )
 
-func (i opId) String() string {
-	return strconv.FormatInt(int64(i), 10)
+func executeGraphQL(ctx context.Context) {
+	results := ctx.Value(executeResultsKey).(chan *graphql.Result)
+	params := ctx.Value(executeParamsKey).(graphql.ExecuteParams)
+
+	// TODO figure out if the input is a query, mutation, or subscription
+	// subscriptions need to be handled differently
+	// ...
+
+	results <- graphql.Execute(params)
+
+	close(results)
 }
 
 func (m message) String() string {
 	return "[" + m.Id.String() + "] " + m.Type + ": " + m.Payload
+}
+
+func (i opId) String() string {
+	return strconv.FormatInt(int64(i), 10)
 }
 
 func (m opMap) Exists(id opId) bool {
@@ -244,13 +257,13 @@ func subscribe(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
 
-	// ...
+	// wrapper around schema and input
 	params := graphql.Params{
 		Schema:        schema,
 		RequestString: input.Payload,
 	}
 
-	// ...
+	// build the request
 	source := source.NewSource(&source.Source{
 		Body: []byte(params.RequestString),
 		Name: "GraphQL request",
@@ -259,34 +272,35 @@ func subscribe(ctx context.Context) {
 	// parse the graphql input
 	ast, err := parser.Parse(parser.ParseParams{Source: source})
 	if err != nil {
+		log.Println("Parse failed", err)
 		return
 	}
 
 	// validate ast against the schema
 	validation := graphql.ValidateDocument(&schema, ast, nil)
 	if !validation.IsValid {
+		log.Println("Validation failed", validation.Errors)
 		return
 	}
 
-	// ...
-	execute := graphql.ExecuteParams{
+	// add results channel and execute params to the context
+	ctx = context.WithValue(ctx, executeResultsKey, make(chan *graphql.Result))
+	ctx = context.WithValue(ctx, executeParamsKey, graphql.ExecuteParams{
 		AST:           ast,
 		Schema:        params.Schema,
 		Root:          params.RootObject,
 		Args:          params.VariableValues,
 		OperationName: params.OperationName,
-	}
+	})
 
-	// ...
-	results := make(chan *graphql.Result)
+	// execute the query in a separate routine
+	// results will be received on the results channel
+	go executeGraphQL(ctx)
+	results := ctx.Value(executeResultsKey).(chan *graphql.Result)
+
+	// stop flag will be set to true when context is cancelled or
+	// results channel is closed
 	stop := false
-
-	// ...
-	go func() {
-		result := graphql.Execute(execute)
-		results <- result
-		close(results)
-	}()
 
 	for !stop {
 		select {
@@ -295,29 +309,38 @@ func subscribe(ctx context.Context) {
 			stop = true
 			break
 
-		// ...
+		// consume results / check if the channel is still open
 		case result, ok := <-results:
 			if ok {
-				if payload, err := json.Marshal(result); err != nil {
-					outputs <- message{
-						Id:   input.Id,
-						Type: "Error",
-					}
-				} else {
+				if payload, err := json.Marshal(result); err == nil {
+					// send the "next" result message
 					outputs <- message{
 						Id:      input.Id,
 						Type:    "Next",
 						Payload: string(payload),
 					}
+				} else {
+					// there was an error marshalling the result
+					outputs <- message{
+						Id:   input.Id,
+						Type: "Error",
+					}
 				}
 			} else {
+				// always send a "complete" message when the query
+				// has finished executing
+				outputs <- message{
+					Id:   input.Id,
+					Type: "Complete",
+				}
+
 				stop = true
 				break
 			}
 		}
 	}
 
-	// need to remove the operation from opmap
+	// TODO need to somehow remove the operation from opmap
 	// ...
 
 }
