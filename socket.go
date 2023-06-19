@@ -22,6 +22,8 @@ func executeGraphQL(ctx context.Context) {
 
 	results <- graphql.Execute(params)
 
+	// graphql.ExecuteSubscription(params)
+
 	close(results)
 }
 
