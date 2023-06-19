@@ -1,0 +1,23 @@
+#+TITLE:  GraphQL websocket server for Golang
+#+AUTHOR: William Santos
+#+EMAIL:  w@wsantos.net
+
+#+LANGUAGE: en
+#+STARTUP:  showall
+#+OPTIONS:  toc:2
+
+✨ Golang server implementing the GraphQL over WebSocket protocol
+
+* Features
+- something
+- something
+- something
+
+* The protocol
+something here
+
+* Authentication
+something here
+
+* Example usage
+something here
