@@ -8,13 +8,16 @@
 
 ✨ Golang server implementing the GraphQL over WebSocket protocol
 
-https://github.com/graphql-go/graphql
-
 * Features
 - Supports queries, mutations, and subscriptions
 - Tested with Apollo WebSocket client
 - Built-in authentication mechanism
 - Examples
+
+* GraphQL schema
+something
+
+https://github.com/graphql-go/graphql
 
 * The protocol
 something
