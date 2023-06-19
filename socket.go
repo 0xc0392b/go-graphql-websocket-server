@@ -26,7 +26,12 @@ func executeGraphQL(ctx context.Context) {
 }
 
 func (m message) String() string {
-	return "[" + m.Id.String() + "] " + m.Type + ": " + m.Payload
+	str := "[" + m.Id.String() + "] " + m.Type
+	if m.Payload == "" {
+		return str
+	} else {
+		return str + ": " + m.Payload
+	}
 }
 
 func (i opId) String() string {
