@@ -12,12 +12,10 @@
 - Supports queries, mutations, and subscriptions
 - Tested with Apollo WebSocket client
 - Built-in authentication mechanism
-- Examples
+- Example projects for reference
 
 * GraphQL schema
-something
-
-https://github.com/graphql-go/graphql
+something here  [[https://github.com/graphql-go/graphql][graphql-go/graphql]]
 
 * The protocol
 something
