@@ -377,29 +377,49 @@ func connectionAck(ctx context.Context) {
 func errorAlreadyInitialised(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error", Payload: "1"}
+	outputs <- message{
+		Id:      input.Id,
+		Type:    "Error",
+		Payload: "session already initialised",
+	}
 }
 
 func errorNotInitialised(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error", Payload: "2"}
+	outputs <- message{
+		Id:      input.Id,
+		Type:    "Error",
+		Payload: "session not initialised",
+	}
 }
 
 func errorIdAlreadyExists(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error", Payload: "3"}
+	outputs <- message{
+		Id:      input.Id,
+		Type:    "Error",
+		Payload: "operation ID already exists",
+	}
 }
 
 func errorIdDoesNotExist(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error", Payload: "4"}
+	outputs <- message{
+		Id:      input.Id,
+		Type:    "Error",
+		Payload: "operation ID does not exist",
+	}
 }
 
 func errorUnknownMessageType(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error", Payload: "5"}
+	outputs <- message{
+		Id:      input.Id,
+		Type:    "Error",
+		Payload: "unknown message type",
+	}
 }
