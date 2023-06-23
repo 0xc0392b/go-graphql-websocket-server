@@ -29,8 +29,22 @@ func newTestSchema() (*graphql.Schema, error) {
 		ticks := make(chan interface{})
 
 		go func() {
-			for i := 0; i < 10; i++ {
-				ticks <- testTick{int64(i)}
+			i := int64(1)
+			stop := false
+
+			for !stop {
+				select {
+				case <-p.Context.Done():
+					stop = true
+					break
+				default:
+					if i > 100 {
+						stop = true
+					} else {
+						ticks <- testTick{i}
+						i++
+					}
+				}
 			}
 
 			close(ticks)
