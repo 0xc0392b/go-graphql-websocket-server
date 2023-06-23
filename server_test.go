@@ -39,13 +39,16 @@ func TestGraphQL(t *testing.T) {
 	in1 := `{"id": 1, "type": "ConnectionInit"}`
 	c.WriteMessage(websocket.TextMessage, []byte(in1))
 
-	in2 := `{"id": 2, "type": "Subscribe", "payload": "query { getUser { id } }"}`
-	c.WriteMessage(websocket.TextMessage, []byte(in2))
+	//	in2 := `{"id": 2, "type": "Subscribe", "payload": "query { getUser { id } }"}`
+	//	c.WriteMessage(websocket.TextMessage, []byte(in2))
 
-	in3 := `{"id": 3, "type": "Subscribe", "payload": "query { getUser { name } }"}`
-	c.WriteMessage(websocket.TextMessage, []byte(in3))
+	//	in3 := `{"id": 3, "type": "Subscribe", "payload": "query { getUser { name } }"}`
+	//	c.WriteMessage(websocket.TextMessage, []byte(in3))
 
-	for count := 0; count < 5; count++ {
+	in4 := `{"id": 4, "type": "Subscribe", "payload": "subscription { tick { value } }"}`
+	c.WriteMessage(websocket.TextMessage, []byte(in4))
+
+	for count := 0; count < 20; count++ {
 		c.SetReadDeadline(time.Now().Add(time.Second * 5))
 		mt, out, err := c.ReadMessage()
 		if err != nil {

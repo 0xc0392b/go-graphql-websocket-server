@@ -20,9 +20,19 @@ func executeGraphQL(ctx context.Context) {
 	// subscriptions need to be handled differently
 	// ...
 
-	results <- graphql.Execute(params)
+	something := "subscription"
 
-	// graphql.ExecuteSubscription(params)
+	switch something {
+	case "query", "mutation":
+		results <- graphql.Execute(params)
+		break
+
+	case "subscription":
+		for result := range graphql.ExecuteSubscription(params) {
+			results <- result
+		}
+		break
+	}
 
 	close(results)
 }
@@ -367,29 +377,29 @@ func connectionAck(ctx context.Context) {
 func errorAlreadyInitialised(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error", Payload: "1"}
 }
 
 func errorNotInitialised(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error", Payload: "2"}
 }
 
 func errorIdAlreadyExists(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error", Payload: "3"}
 }
 
 func errorIdDoesNotExist(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error", Payload: "4"}
 }
 
 func errorUnknownMessageType(ctx context.Context) {
 	input := ctx.Value(messageKey).(message)
 	outputs := ctx.Value(outputsKey).(chan message)
-	outputs <- message{Id: input.Id, Type: "Error"}
+	outputs <- message{Id: input.Id, Type: "Error", Payload: "5"}
 }

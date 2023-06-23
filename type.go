@@ -30,9 +30,13 @@ type opMap map[opId]op
 type action func(context.Context)
 
 type testUser struct {
-	Id    int64
-	Name  string
-	Email string
+	Id    int64  `graphql:"id"`
+	Name  string `graphql:"name"`
+	Email string `graphql:"email"`
+}
+
+type testTick struct {
+	Value int64 `graphql:"value"`
 }
 
 type op struct {

@@ -21,6 +21,24 @@ func newTestSchema() (*graphql.Schema, error) {
 		return testUser{1, "test user", "test@user.com"}, nil
 	}
 
+	tickResolver := func(p graphql.ResolveParams) (interface{}, error) {
+		return p.Source, nil
+	}
+
+	tickSubscriber := func(p graphql.ResolveParams) (interface{}, error) {
+		ticks := make(chan interface{})
+
+		go func() {
+			for i := 0; i < 10; i++ {
+				ticks <- testTick{int64(i)}
+			}
+
+			close(ticks)
+		}()
+
+		return ticks, nil
+	}
+
 	userType := graphql.NewObject(
 		graphql.ObjectConfig{
 			Name: "User",
@@ -28,6 +46,15 @@ func newTestSchema() (*graphql.Schema, error) {
 				"id":    &graphql.Field{Type: graphql.Int},
 				"name":  &graphql.Field{Type: graphql.String},
 				"email": &graphql.Field{Type: graphql.String},
+			},
+		},
+	)
+
+	tickType := graphql.NewObject(
+		graphql.ObjectConfig{
+			Name: "Tick",
+			Fields: graphql.Fields{
+				"value": &graphql.Field{Type: graphql.Int},
 			},
 		},
 	)
@@ -45,9 +72,24 @@ func newTestSchema() (*graphql.Schema, error) {
 		},
 	)
 
+	subscriptionType := graphql.NewObject(
+		graphql.ObjectConfig{
+			Name: "Subscription",
+			Fields: graphql.Fields{
+				"tick": &graphql.Field{
+					Type:        tickType,
+					Resolve:     tickResolver,
+					Subscribe:   tickSubscriber,
+					Description: "Tick tock tick tock...",
+				},
+			},
+		},
+	)
+
 	if schema, err := graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query: queryType,
+			Query:        queryType,
+			Subscription: subscriptionType,
 		},
 	); err != nil {
 		return nil, err
