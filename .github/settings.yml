@@ -1,6 +1,6 @@
 repository:
   name: "go-graphql-websocket-server"
-  description: "✨ Golang server implementing the GraphQL over WebSocket protocol"
+  description: "✨ Golang server implementing the GraphQL over WebSocket protocol. Depends on gorilla/websocket and graphql-go/graphql"
   private: true
   has_issues: true
   has_projects: false
