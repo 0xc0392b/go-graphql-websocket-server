@@ -15,55 +15,64 @@
 - Example projects for reference
 
 * GraphQL schema
-something here  [[https://github.com/graphql-go/graphql][graphql-go/graphql]]
+The [[https://github.com/graphql-go/graphql][graphql-go/graphql]] package is the required package for defining a
+GraphQL schema. For example:
+
+#+BEGIN_SRC go
+  userResolver := func(p graphql.ResolveParams) (interface{}, error) {
+	  return testUser{1, "test user", "test@user.com"}, nil
+  }
+
+  userType := graphql.NewObject(
+	  graphql.ObjectConfig{
+		  Name: "User",
+		  Fields: graphql.Fields{
+			  "id":    &graphql.Field{Type: graphql.Int},
+			  "name":  &graphql.Field{Type: graphql.String},
+			  "email": &graphql.Field{Type: graphql.String},
+		  },
+	  },
+  )
+
+  queryType := graphql.NewObject(
+	  graphql.ObjectConfig{
+		  Name: "Query",
+		  Fields: graphql.Fields{
+			  "getUser": &graphql.Field{
+				  Type:        userType,
+				  Resolve:     userResolver,
+				  Description: "Get test user",
+			  },
+		  },
+	  },
+  )
+
+  if schema, err := graphql.NewSchema(
+	  graphql.SchemaConfig{
+		  Query:        queryType,
+	  },
+  ); err != nil {
+	  return nil, err
+  } else {
+	  return &schema, nil
+  }
+#+END_SRC
 
 * The protocol
-something
+The protocol is defined in [[https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md][enisdenjo/graphql-ws]] and consists of the
+following eight message types:
 
-https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
-
-** ConnectionInit
-- Direction: client -> server
-
-something
-
-** ConnectionAck
-- Direction: client <- server
-
-something
-
-** Ping
-- Direction: client <-> server
-
-something
-
-** Pong
-- Direction: client <-> server
-
-something
-
-** Subscribe
-- Direction: client -> server
-
-something
-
-** Next
-- Direction: client <- server
-
-something
-
-** Error
-- Direction: client <- server
-
-something
-
-** Complete
-- Direction: client <-> server
-
-something
+1) ConnectionInit (client -> server)
+2) ConnectionAck (client <- server)
+3) Ping (client <-> server)
+4) Pong (client <-> server)
+5) Subscribe (client -> server)
+6) Next (client <- server)
+7) Error (client <- server)
+8) Complete (client <-> server)
 
 * Authentication
-something here
+...
 
 * Example usage
-something here
+...
